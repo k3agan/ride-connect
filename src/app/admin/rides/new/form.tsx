@@ -1,24 +1,25 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, useMemo } from "react";
 import { createRide } from "@/lib/actions/rides";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Toggle } from "@/components/ui/toggle";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { suggestZone } from "@/lib/zones";
+import Link from "next/link";
 type TripType = "one_way" | "round_trip" | "one_way_possible";
-type MobilityAid = "none" | "walker" | "cane" | "wheelchair" | "other";
 type Zone = "north_van" | "west_van" | "downtown_van" | "other";
 
-const MOBILITY_OPTIONS = [
-  { value: "none", label: "None" },
-  { value: "walker", label: "Walker" },
-  { value: "cane", label: "Cane" },
-  { value: "wheelchair", label: "Wheelchair" },
-  { value: "other", label: "Other" },
-];
+interface ClientRecord {
+  id: string;
+  name: string;
+  address: string;
+  phone: string;
+  mobilityAid: string;
+  assistanceInOut: boolean;
+  generalNotes: string | null;
+}
 
 const TRIP_TYPE_OPTIONS = [
   { value: "round_trip", label: "Round Trip" },
@@ -33,10 +34,33 @@ const ZONE_OPTIONS = [
   { value: "other", label: "Other" },
 ];
 
-export function NewRideForm() {
-  const [mobilityAid, setMobilityAid] = useState<MobilityAid>("none");
-  const [assistanceInOut, setAssistanceInOut] = useState(false);
+export function NewRideForm({ clients }: { clients: ClientRecord[] }) {
+  const [selectedClientId, setSelectedClientId] = useState("");
+  const [clientSearch, setClientSearch] = useState("");
+  const [pickupAddress, setPickupAddress] = useState("");
   const [zone, setZone] = useState<Zone>("north_van");
+
+  const selectedClient = useMemo(
+    () => clients.find((c) => c.id === selectedClientId),
+    [clients, selectedClientId]
+  );
+
+  const filteredClients = useMemo(() => {
+    if (!clientSearch) return clients;
+    const q = clientSearch.toLowerCase();
+    return clients.filter((c) => c.name.toLowerCase().includes(q));
+  }, [clients, clientSearch]);
+
+  const handleClientSelect = (clientId: string) => {
+    setSelectedClientId(clientId);
+    const client = clients.find((c) => c.id === clientId);
+    if (client) {
+      setPickupAddress(client.address);
+      const suggested = suggestZone(client.address);
+      setZone(suggested);
+      setClientSearch("");
+    }
+  };
 
   const handleAddressBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     const suggested = suggestZone(e.target.value);
@@ -44,19 +68,19 @@ export function NewRideForm() {
   };
 
   async function handleSubmit(_prev: unknown, formData: FormData) {
+    if (!selectedClientId) {
+      return { error: "Please select a client." };
+    }
     try {
       await createRide({
-        seniorName: formData.get("seniorName") as string,
-        seniorPhone: formData.get("seniorPhone") as string,
+        clientId: selectedClientId,
         pickupAddress: formData.get("pickupAddress") as string,
+        facilityName: formData.get("facilityName") as string,
         destinationAddress: formData.get("destinationAddress") as string,
         appointmentDate: formData.get("appointmentDate") as string,
         appointmentTime: formData.get("appointmentTime") as string,
         appointmentDuration: formData.get("appointmentDuration") as string,
         tripType: formData.get("tripType") as TripType,
-        mobilityAid: formData.get("mobilityAid") as MobilityAid,
-        mobilityAidNotes: formData.get("mobilityAidNotes") as string,
-        assistanceInOut,
         zone: formData.get("zone") as Zone,
         notes: formData.get("notes") as string,
       });
@@ -77,18 +101,71 @@ export function NewRideForm() {
 
           <fieldset className="space-y-4">
             <legend className="text-lg font-semibold text-gray-900">
-              Senior Information
+              Client
             </legend>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Input label="Senior's Name" name="seniorName" required />
-              <Input
-                label="Phone Number"
-                name="seniorPhone"
-                type="tel"
-                placeholder="(604) 555-0100"
-                required
-              />
-            </div>
+
+            {!selectedClient ? (
+              <div className="space-y-2">
+                <Input
+                  label="Search clients"
+                  value={clientSearch}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setClientSearch(e.target.value)}
+                  placeholder="Type a client name..."
+                />
+                <div className="max-h-48 overflow-y-auto rounded-lg border border-gray-200">
+                  {filteredClients.length === 0 ? (
+                    <div className="p-4 text-center text-sm text-gray-500">
+                      No clients found.{" "}
+                      <Link href="/admin/clients/new" className="text-blue-600 hover:underline">
+                        Register a new client
+                      </Link>
+                    </div>
+                  ) : (
+                    filteredClients.map((client) => (
+                      <button
+                        key={client.id}
+                        type="button"
+                        onClick={() => handleClientSelect(client.id)}
+                        className="w-full text-left px-4 py-3 hover:bg-blue-50 border-b border-gray-100 last:border-b-0 transition-colors"
+                      >
+                        <p className="font-medium text-gray-900">{client.name}</p>
+                        <p className="text-sm text-gray-500">{client.phone} — {client.address}</p>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-lg bg-blue-50 border border-blue-200 p-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="font-semibold text-gray-900">{selectedClient.name}</p>
+                    <p className="text-sm text-gray-600">{selectedClient.phone}</p>
+                    <p className="text-sm text-gray-600">{selectedClient.address}</p>
+                    {selectedClient.mobilityAid !== "none" && (
+                      <p className="text-sm text-gray-600">Mobility: {selectedClient.mobilityAid}</p>
+                    )}
+                    {selectedClient.assistanceInOut && (
+                      <p className="text-sm text-gray-600">Needs assistance in/out</p>
+                    )}
+                    {selectedClient.generalNotes && (
+                      <p className="text-sm text-gray-500 italic mt-1">{selectedClient.generalNotes}</p>
+                    )}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedClientId("");
+                      setPickupAddress("");
+                    }}
+                  >
+                    Change
+                  </Button>
+                </div>
+              </div>
+            )}
           </fieldset>
 
           <fieldset className="space-y-4">
@@ -100,7 +177,14 @@ export function NewRideForm() {
               name="pickupAddress"
               placeholder="Full street address"
               required
+              value={pickupAddress}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPickupAddress(e.target.value)}
               onBlur={handleAddressBlur}
+            />
+            <Input
+              label="Facility Name"
+              name="facilityName"
+              placeholder="e.g. St. Antonius Hospital"
             />
             <Input
               label="Appointment Address"
@@ -142,33 +226,6 @@ export function NewRideForm() {
 
           <fieldset className="space-y-4">
             <legend className="text-lg font-semibold text-gray-900">
-              Accessibility
-            </legend>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Select
-                label="Mobility Aid"
-                name="mobilityAid"
-                options={MOBILITY_OPTIONS}
-                value={mobilityAid}
-                onChange={(e) => setMobilityAid(e.target.value as MobilityAid)}
-              />
-              {mobilityAid !== "none" && (
-                <Input
-                  label="Mobility Notes"
-                  name="mobilityAidNotes"
-                  placeholder="e.g. Visual impairment, speech impediment"
-                />
-              )}
-            </div>
-            <Toggle
-              label="Needs Assistance In/Out of Vehicle"
-              checked={assistanceInOut}
-              onChange={setAssistanceInOut}
-            />
-          </fieldset>
-
-          <fieldset className="space-y-4">
-            <legend className="text-lg font-semibold text-gray-900">
               Additional Notes
             </legend>
             <textarea
@@ -180,7 +237,7 @@ export function NewRideForm() {
           </fieldset>
 
           <div className="flex justify-end gap-3 pt-4">
-            <Button type="submit" size="lg" disabled={isPending}>
+            <Button type="submit" size="lg" disabled={isPending || !selectedClientId}>
               {isPending ? "Publishing..." : "Publish Ride Request"}
             </Button>
           </div>

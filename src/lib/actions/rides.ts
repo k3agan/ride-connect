@@ -3,23 +3,20 @@
 import { prisma } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { auth } from "@/lib/auth";
-import { notifyNewRide, notifyRideClaimed, notifyRideCancelled } from "@/lib/notifications";
+import { notifyNewRide, notifyRideBooked, notifyRideConfirmed, notifyRideCancelled } from "@/lib/notifications";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { type TripType, type MobilityAid, type Zone, type RideStatus } from "@/generated/prisma/client";
+import { type TripType, type MobilityAid, type Zone } from "@/generated/prisma/client";
 
 interface CreateRideInput {
-  seniorName: string;
-  seniorPhone: string;
+  clientId: string;
   pickupAddress: string;
+  facilityName: string;
   destinationAddress: string;
   appointmentDate: string;
   appointmentTime: string;
   appointmentDuration: string;
   tripType: TripType;
-  mobilityAid: MobilityAid;
-  mobilityAidNotes: string;
-  assistanceInOut: boolean;
   zone: Zone;
   notes: string;
 }
@@ -30,19 +27,25 @@ export async function createRide(input: CreateRideInput) {
     throw new Error("Unauthorized");
   }
 
+  const client = await prisma.client.findUnique({ where: { id: input.clientId } });
+  if (!client) {
+    throw new Error("Client not found");
+  }
+
   const ride = await prisma.ride.create({
     data: {
-      seniorName: input.seniorName,
-      seniorPhone: input.seniorPhone,
-      pickupAddress: input.pickupAddress,
+      clientId: client.id,
+      seniorName: client.name,
+      seniorPhone: client.phone,
+      pickupAddress: input.pickupAddress || client.address,
+      facilityName: input.facilityName || null,
       destinationAddress: input.destinationAddress,
       appointmentDate: new Date(input.appointmentDate),
       appointmentTime: input.appointmentTime,
       appointmentDuration: input.appointmentDuration,
       tripType: input.tripType,
-      mobilityAid: input.mobilityAid,
-      mobilityAidNotes: input.mobilityAidNotes || null,
-      assistanceInOut: input.assistanceInOut,
+      mobilityAid: client.mobilityAid,
+      assistanceInOut: client.assistanceInOut,
       zone: input.zone,
       notes: input.notes || null,
       createdById: session.user.id,
@@ -54,7 +57,7 @@ export async function createRide(input: CreateRideInput) {
     actorId: session.user.id,
     action: "created",
     newValues: {
-      seniorName: ride.seniorName,
+      clientName: client.name,
       appointmentDate: ride.appointmentDate.toISOString(),
       appointmentTime: ride.appointmentTime,
       zone: ride.zone,
@@ -68,26 +71,25 @@ export async function createRide(input: CreateRideInput) {
   redirect("/admin");
 }
 
-export async function claimRide(rideId: string) {
+export async function acceptRide(rideId: string) {
   const session = await auth();
   if (!session?.user) {
     throw new Error("Unauthorized");
   }
 
   const ride = await prisma.ride.findUnique({ where: { id: rideId } });
-  if (!ride || ride.status !== "available") {
-    return { error: "This ride has already been claimed or is no longer available." };
+  if (!ride || ride.status !== "open") {
+    return { error: "This ride has already been taken or is no longer available." };
   }
 
-  // Optimistic locking: only update if version hasn't changed
   const result = await prisma.ride.updateMany({
     where: {
       id: rideId,
-      status: "available",
+      status: "open",
       version: ride.version,
     },
     data: {
-      status: "claimed",
+      status: "booked",
       claimedById: session.user.id,
       claimedAt: new Date(),
       version: ride.version + 1,
@@ -95,20 +97,58 @@ export async function claimRide(rideId: string) {
   });
 
   if (result.count === 0) {
-    return { error: "This ride has already been claimed by another volunteer." };
+    return { error: "This ride has already been taken by another volunteer." };
   }
 
   await logAudit({
     rideId,
     actorId: session.user.id,
-    action: "claimed",
-    oldValues: { status: "available" },
-    newValues: { status: "claimed", claimedBy: session.user.id },
+    action: "booked",
+    oldValues: { status: "open" },
+    newValues: { status: "booked", claimedBy: session.user.id },
   });
 
   const updatedRide = await prisma.ride.findUnique({ where: { id: rideId } });
   if (updatedRide) {
-    notifyRideClaimed(updatedRide, session.user.email).catch(console.error);
+    notifyRideBooked(updatedRide, session.user.name || session.user.email).catch(console.error);
+  }
+
+  revalidatePath("/rides");
+  revalidatePath("/my-rides");
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+export async function confirmRide(rideId: string) {
+  const session = await auth();
+  if (!session?.user || session.user.role !== "admin") {
+    throw new Error("Unauthorized");
+  }
+
+  const ride = await prisma.ride.findUnique({ where: { id: rideId } });
+  if (!ride || ride.status !== "booked") {
+    return { error: "This ride is not in booked status." };
+  }
+
+  await prisma.ride.update({
+    where: { id: rideId },
+    data: {
+      status: "confirmed",
+      confirmedAt: new Date(),
+      version: { increment: 1 },
+    },
+  });
+
+  await logAudit({
+    rideId,
+    actorId: session.user.id,
+    action: "confirmed",
+    oldValues: { status: "booked" },
+    newValues: { status: "confirmed" },
+  });
+
+  if (ride.claimedById) {
+    notifyRideConfirmed(ride, ride.claimedById).catch(console.error);
   }
 
   revalidatePath("/rides");
@@ -138,9 +178,10 @@ export async function unclaimRide(rideId: string) {
   await prisma.ride.update({
     where: { id: rideId },
     data: {
-      status: "available",
+      status: "open",
       claimedById: null,
       claimedAt: null,
+      confirmedAt: null,
       version: { increment: 1 },
     },
   });
@@ -150,7 +191,7 @@ export async function unclaimRide(rideId: string) {
     actorId: session.user.id,
     action: "unclaimed",
     oldValues: { status: ride.status, claimedBy: ride.claimedById },
-    newValues: { status: "available", claimedBy: null },
+    newValues: { status: "open", claimedBy: null },
   });
 
   notifyRideCancelled(ride, session.user.name || session.user.email).catch(console.error);
@@ -161,7 +202,10 @@ export async function unclaimRide(rideId: string) {
   return { success: true };
 }
 
-export async function updateRideStatus(rideId: string, status: RideStatus) {
+export async function completeRide(
+  rideId: string,
+  data: { kmDriven?: number; actualDurationMinutes?: number }
+) {
   const session = await auth();
   if (!session?.user) {
     throw new Error("Unauthorized");
@@ -172,17 +216,29 @@ export async function updateRideStatus(rideId: string, status: RideStatus) {
     return { error: "Ride not found." };
   }
 
+  const isAdmin = session.user.role === "admin";
+  const isClaimOwner = ride.claimedById === session.user.id;
+  if (!isAdmin && !isClaimOwner) {
+    return { error: "You can only complete your own rides." };
+  }
+
   await prisma.ride.update({
     where: { id: rideId },
-    data: { status, version: { increment: 1 } },
+    data: {
+      status: "completed",
+      completedAt: new Date(),
+      kmDriven: data.kmDriven ?? null,
+      actualDurationMinutes: data.actualDurationMinutes ?? null,
+      version: { increment: 1 },
+    },
   });
 
   await logAudit({
     rideId,
     actorId: session.user.id,
-    action: status === "completed" ? "completed" : "edited",
+    action: "completed",
     oldValues: { status: ride.status },
-    newValues: { status },
+    newValues: { status: "completed", kmDriven: data.kmDriven, actualDurationMinutes: data.actualDurationMinutes },
   });
 
   revalidatePath("/rides");
@@ -191,7 +247,27 @@ export async function updateRideStatus(rideId: string, status: RideStatus) {
   return { success: true };
 }
 
-export async function cancelRide(rideId: string) {
+export async function updateVolunteerNotes(rideId: string, volunteerNotes: string) {
+  const session = await auth();
+  if (!session?.user) {
+    throw new Error("Unauthorized");
+  }
+
+  const ride = await prisma.ride.findUnique({ where: { id: rideId } });
+  if (!ride || ride.claimedById !== session.user.id) {
+    return { error: "You can only add notes to your own rides." };
+  }
+
+  await prisma.ride.update({
+    where: { id: rideId },
+    data: { volunteerNotes },
+  });
+
+  revalidatePath("/my-rides");
+  return { success: true };
+}
+
+export async function deleteRide(rideId: string) {
   const session = await auth();
   if (!session?.user || session.user.role !== "admin") {
     throw new Error("Unauthorized");
@@ -204,15 +280,15 @@ export async function cancelRide(rideId: string) {
 
   await prisma.ride.update({
     where: { id: rideId },
-    data: { status: "cancelled", version: { increment: 1 } },
+    data: { status: "deleted", version: { increment: 1 } },
   });
 
   await logAudit({
     rideId,
     actorId: session.user.id,
-    action: "cancelled",
+    action: "deleted",
     oldValues: { status: ride.status },
-    newValues: { status: "cancelled" },
+    newValues: { status: "deleted" },
   });
 
   revalidatePath("/admin");

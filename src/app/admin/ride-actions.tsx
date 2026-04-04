@@ -1,8 +1,8 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { cancelRide, unclaimRide } from "@/lib/actions/rides";
-type RideStatus = "available" | "claimed" | "in_progress" | "completed" | "cancelled";
+import { confirmRide, deleteRide, unclaimRide } from "@/lib/actions/rides";
+type RideStatus = "open" | "booked" | "confirmed" | "completed" | "deleted";
 import { useTransition } from "react";
 
 export function AdminRideActions({
@@ -14,15 +14,22 @@ export function AdminRideActions({
 }) {
   const [isPending, startTransition] = useTransition();
 
-  const handleCancel = () => {
-    if (!confirm("Are you sure you want to cancel this ride?")) return;
+  const handleConfirm = () => {
+    if (!confirm("Have you called the client? Confirming will notify the volunteer that the ride is officially theirs.")) return;
     startTransition(() => {
-      cancelRide(rideId);
+      confirmRide(rideId);
+    });
+  };
+
+  const handleDelete = () => {
+    if (!confirm("Are you sure you want to delete this ride?")) return;
+    startTransition(() => {
+      deleteRide(rideId);
     });
   };
 
   const handleUnclaim = () => {
-    if (!confirm("Remove the volunteer assignment and make this ride available again?")) return;
+    if (!confirm("Remove the volunteer assignment and make this ride open again?")) return;
     startTransition(() => {
       unclaimRide(rideId);
     });
@@ -30,7 +37,17 @@ export function AdminRideActions({
 
   return (
     <div className="flex flex-col gap-1">
-      {status === "claimed" && (
+      {status === "booked" && (
+        <Button
+          variant="success"
+          size="sm"
+          onClick={handleConfirm}
+          disabled={isPending}
+        >
+          ✓ Confirm Ride
+        </Button>
+      )}
+      {(status === "booked" || status === "confirmed") && (
         <Button
           variant="secondary"
           size="sm"
@@ -40,14 +57,14 @@ export function AdminRideActions({
           Reassign
         </Button>
       )}
-      {(status === "available" || status === "claimed") && (
+      {(status === "open" || status === "booked" || status === "confirmed") && (
         <Button
           variant="danger"
           size="sm"
-          onClick={handleCancel}
+          onClick={handleDelete}
           disabled={isPending}
         >
-          Cancel Ride
+          Delete Ride
         </Button>
       )}
     </div>

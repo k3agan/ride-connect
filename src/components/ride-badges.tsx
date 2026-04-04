@@ -2,11 +2,11 @@ import { Badge } from "@/components/ui/badge";
 import { type RideStatus, type TripType, type MobilityAid, type Zone } from "@/generated/prisma/client";
 
 const STATUS_CONFIG: Record<RideStatus, { label: string; variant: "success" | "warning" | "danger" | "info" | "default" }> = {
-  available: { label: "Available", variant: "success" },
-  claimed: { label: "Claimed", variant: "info" },
-  in_progress: { label: "In Progress", variant: "warning" },
+  open: { label: "Open", variant: "success" },
+  booked: { label: "Booked", variant: "warning" },
+  confirmed: { label: "Confirmed", variant: "info" },
   completed: { label: "Completed", variant: "default" },
-  cancelled: { label: "Cancelled", variant: "danger" },
+  deleted: { label: "Deleted", variant: "danger" },
 };
 
 export function StatusBadge({ status }: { status: RideStatus }) {

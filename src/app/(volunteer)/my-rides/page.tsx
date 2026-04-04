@@ -15,15 +15,31 @@ export default async function MyRidesPage() {
 
   const rides = await prisma.ride.findMany({
     where: { claimedById: session.user.id },
+    include: { client: true },
     orderBy: { appointmentDate: "asc" },
   });
 
+  const volunteer = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { address: true },
+  });
+
   const upcoming = rides.filter(
-    (r) => r.status === "claimed" || r.status === "in_progress"
+    (r) => r.status === "booked" || r.status === "confirmed"
   );
   const past = rides.filter(
-    (r) => r.status === "completed" || r.status === "cancelled"
+    (r) => r.status === "completed" || r.status === "deleted"
   );
+
+  const mapsRouteUrl = (pickupAddress: string, destAddress: string) => {
+    const origin = volunteer?.address ? encodeURIComponent(volunteer.address) : "";
+    const waypoint = encodeURIComponent(pickupAddress);
+    const dest = encodeURIComponent(destAddress);
+    if (origin) {
+      return `https://www.google.com/maps/dir/?api=1&origin=${origin}&waypoints=${waypoint}&destination=${dest}`;
+    }
+    return `https://www.google.com/maps/dir/?api=1&origin=${waypoint}&destination=${dest}`;
+  };
 
   return (
     <div className="space-y-8">
@@ -36,14 +52,14 @@ export default async function MyRidesPage() {
             <p className="text-gray-500">
               No upcoming rides. Browse{" "}
               <a href="/rides" className="text-blue-600 hover:underline">
-                available rides
+                open rides
               </a>{" "}
-              to claim one.
+              to accept one.
             </p>
           </Card>
         ) : (
           upcoming.map((ride) => (
-            <RideCard key={ride.id} ride={ride} showActions />
+            <RideCard key={ride.id} ride={ride} mapsRouteUrl={mapsRouteUrl} showActions />
           ))
         )}
       </section>
@@ -52,7 +68,7 @@ export default async function MyRidesPage() {
         <section className="space-y-4">
           <h2 className="text-lg font-semibold text-gray-800">Past Rides</h2>
           {past.map((ride) => (
-            <RideCard key={ride.id} ride={ride} showActions={false} />
+            <RideCard key={ride.id} ride={ride} mapsRouteUrl={mapsRouteUrl} showActions={false} />
           ))}
         </section>
       )}
@@ -62,6 +78,7 @@ export default async function MyRidesPage() {
 
 function RideCard({
   ride,
+  mapsRouteUrl,
   showActions,
 }: {
   ride: {
@@ -69,6 +86,7 @@ function RideCard({
     seniorName: string;
     seniorPhone: string;
     pickupAddress: string;
+    facilityName: string | null;
     destinationAddress: string;
     appointmentDate: Date;
     appointmentTime: string;
@@ -78,14 +96,15 @@ function RideCard({
     mobilityAidNotes: string | null;
     assistanceInOut: boolean;
     zone: "north_van" | "west_van" | "downtown_van" | "other";
-    status: "available" | "claimed" | "in_progress" | "completed" | "cancelled";
+    status: "open" | "booked" | "confirmed" | "completed" | "deleted";
     notes: string | null;
+    volunteerNotes: string | null;
+    kmDriven: number | null;
+    actualDurationMinutes: number | null;
   };
+  mapsRouteUrl: (pickup: string, dest: string) => string;
   showActions: boolean;
 }) {
-  const mapsUrl = (address: string) =>
-    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
-
   return (
     <Card className="p-5">
       <div className="space-y-3">
@@ -100,6 +119,14 @@ function RideCard({
           </span>
           <StatusBadge status={ride.status} />
         </div>
+
+        {ride.status === "booked" && (
+          <div className="rounded-lg bg-amber-50 border border-amber-200 p-3">
+            <p className="text-sm text-amber-800">
+              Awaiting coordinator confirmation. You&apos;ll be notified once confirmed.
+            </p>
+          </div>
+        )}
 
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-2">
@@ -132,7 +159,7 @@ function RideCard({
             <p className="text-sm font-medium text-gray-700">Pickup</p>
             <p className="text-base text-gray-900">{ride.pickupAddress}</p>
             <a
-              href={mapsUrl(ride.pickupAddress)}
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ride.pickupAddress)}`}
               target="_blank"
               rel="noopener noreferrer"
               className="mt-1 inline-block text-sm text-blue-600 hover:underline"
@@ -142,12 +169,14 @@ function RideCard({
           </div>
 
           <div className="rounded-lg bg-gray-50 p-3">
-            <p className="text-sm font-medium text-gray-700">Appointment</p>
+            <p className="text-sm font-medium text-gray-700">
+              {ride.facilityName ? `${ride.facilityName}` : "Appointment"}
+            </p>
             <p className="text-base text-gray-900">
               {ride.destinationAddress}
             </p>
             <a
-              href={mapsUrl(ride.destinationAddress)}
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ride.destinationAddress)}`}
               target="_blank"
               rel="noopener noreferrer"
               className="mt-1 inline-block text-sm text-blue-600 hover:underline"
@@ -155,6 +184,15 @@ function RideCard({
               Open in Maps →
             </a>
           </div>
+
+          <a
+            href={mapsRouteUrl(ride.pickupAddress, ride.destinationAddress)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
+          >
+            📍 View Full Route in Maps
+          </a>
         </div>
 
         <AccessibilityIndicators
@@ -165,6 +203,20 @@ function RideCard({
 
         {ride.notes && (
           <p className="text-sm text-gray-500 italic">Note: {ride.notes}</p>
+        )}
+
+        {ride.volunteerNotes && (
+          <div className="rounded-lg bg-blue-50 border border-blue-200 p-3">
+            <p className="text-sm font-medium text-blue-800">Your Notes</p>
+            <p className="text-sm text-blue-700">{ride.volunteerNotes}</p>
+          </div>
+        )}
+
+        {ride.status === "completed" && (ride.kmDriven || ride.actualDurationMinutes) && (
+          <div className="flex gap-4 text-sm text-gray-500">
+            {ride.kmDriven && <span>KM driven: {ride.kmDriven}</span>}
+            {ride.actualDurationMinutes && <span>Duration: {ride.actualDurationMinutes} min</span>}
+          </div>
         )}
 
         {showActions && (

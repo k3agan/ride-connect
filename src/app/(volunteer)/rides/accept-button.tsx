@@ -2,9 +2,9 @@
 
 import { useTransition, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { claimRide } from "@/lib/actions/rides";
+import { acceptRide } from "@/lib/actions/rides";
 
-export function ClaimButton({
+export function AcceptButton({
   rideId,
 }: {
   rideId: string;
@@ -13,11 +13,11 @@ export function ClaimButton({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const handleClaim = () => {
-    if (!confirm("Claim this ride? You'll see full address and contact details after confirming.")) return;
+  const handleAccept = () => {
+    if (!confirm("Accept this ride? You'll see full address and contact details after the coordinator confirms.")) return;
     setError(null);
     startTransition(async () => {
-      const result = await claimRide(rideId);
+      const result = await acceptRide(rideId);
       if (result?.error) {
         setError(result.error);
       }
@@ -29,11 +29,11 @@ export function ClaimButton({
       <Button
         size="lg"
         variant="success"
-        onClick={handleClaim}
+        onClick={handleAccept}
         disabled={isPending}
         className="min-w-[180px]"
       >
-        {isPending ? "Claiming..." : "Claim This Ride"}
+        {isPending ? "Accepting..." : "Accept Ride"}
       </Button>
       {error && <p className="text-sm text-red-600 text-right">{error}</p>}
     </div>

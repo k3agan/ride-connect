@@ -19,6 +19,7 @@ export default async function RideDetailPage({
   const ride = await prisma.ride.findUnique({
     where: { id },
     include: {
+      client: true,
       claimedBy: { select: { name: true, email: true, phone: true } },
       createdBy: { select: { name: true } },
     },
@@ -38,6 +39,14 @@ export default async function RideDetailPage({
         Ride: {ride.seniorName}
       </h1>
 
+      {ride.status === "booked" && (
+        <div className="rounded-lg bg-amber-50 border-2 border-amber-400 p-4">
+          <p className="font-medium text-amber-800">
+            ⚠ This ride is booked but not yet confirmed. Please call the client and then confirm.
+          </p>
+        </div>
+      )}
+
       <Card>
         <CardBody>
           <div className="space-y-4">
@@ -49,7 +58,7 @@ export default async function RideDetailPage({
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-3">
-                <h3 className="font-semibold text-gray-900">Senior</h3>
+                <h3 className="font-semibold text-gray-900">Client</h3>
                 <dl className="space-y-1 text-sm text-gray-600">
                   <div>
                     <dt className="font-medium inline">Name:</dt>{" "}
@@ -63,6 +72,27 @@ export default async function RideDetailPage({
                       </a>
                     </dd>
                   </div>
+                  {ride.client && (
+                    <>
+                      {ride.client.mobilityAid !== "none" && (
+                        <div>
+                          <dt className="font-medium inline">Mobility Aid:</dt>{" "}
+                          <dd className="inline capitalize">{ride.client.mobilityAid}</dd>
+                        </div>
+                      )}
+                      {ride.client.assistanceInOut && (
+                        <div>
+                          <dd className="text-amber-700 font-medium">Needs assistance in/out of vehicle</dd>
+                        </div>
+                      )}
+                      {ride.client.generalNotes && (
+                        <div>
+                          <dt className="font-medium inline">Client Notes:</dt>{" "}
+                          <dd className="inline italic">{ride.client.generalNotes}</dd>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </dl>
               </div>
 
@@ -99,6 +129,12 @@ export default async function RideDetailPage({
                   <dt className="font-medium inline">Pickup:</dt>{" "}
                   <dd className="inline">{ride.pickupAddress}</dd>
                 </div>
+                {ride.facilityName && (
+                  <div>
+                    <dt className="font-medium inline">Facility:</dt>{" "}
+                    <dd className="inline">{ride.facilityName}</dd>
+                  </div>
+                )}
                 <div>
                   <dt className="font-medium inline">Destination:</dt>{" "}
                   <dd className="inline">{ride.destinationAddress}</dd>
@@ -138,9 +174,17 @@ export default async function RideDetailPage({
                   )}
                   {ride.claimedAt && (
                     <div>
-                      <dt className="font-medium inline">Claimed at:</dt>{" "}
+                      <dt className="font-medium inline">Booked at:</dt>{" "}
                       <dd className="inline">
                         {new Date(ride.claimedAt).toLocaleString()}
+                      </dd>
+                    </div>
+                  )}
+                  {ride.confirmedAt && (
+                    <div>
+                      <dt className="font-medium inline">Confirmed at:</dt>{" "}
+                      <dd className="inline">
+                        {new Date(ride.confirmedAt).toLocaleString()}
                       </dd>
                     </div>
                   )}
@@ -148,10 +192,43 @@ export default async function RideDetailPage({
               </div>
             )}
 
+            {ride.volunteerNotes && (
+              <div className="space-y-3">
+                <h3 className="font-semibold text-gray-900">Volunteer Notes</h3>
+                <p className="text-sm text-gray-600 bg-blue-50 rounded-lg p-3">{ride.volunteerNotes}</p>
+              </div>
+            )}
+
             {ride.notes && (
               <div className="space-y-3">
-                <h3 className="font-semibold text-gray-900">Notes</h3>
+                <h3 className="font-semibold text-gray-900">Ride Notes</h3>
                 <p className="text-sm text-gray-600">{ride.notes}</p>
+              </div>
+            )}
+
+            {ride.status === "completed" && (
+              <div className="space-y-3">
+                <h3 className="font-semibold text-gray-900">Trip Details</h3>
+                <dl className="space-y-1 text-sm text-gray-600">
+                  {ride.completedAt && (
+                    <div>
+                      <dt className="font-medium inline">Completed at:</dt>{" "}
+                      <dd className="inline">{new Date(ride.completedAt).toLocaleString()}</dd>
+                    </div>
+                  )}
+                  {ride.kmDriven != null && (
+                    <div>
+                      <dt className="font-medium inline">KM driven:</dt>{" "}
+                      <dd className="inline">{ride.kmDriven}</dd>
+                    </div>
+                  )}
+                  {ride.actualDurationMinutes != null && (
+                    <div>
+                      <dt className="font-medium inline">Actual duration:</dt>{" "}
+                      <dd className="inline">{ride.actualDurationMinutes} minutes</dd>
+                    </div>
+                  )}
+                </dl>
               </div>
             )}
 

@@ -1,8 +1,8 @@
 "use client";
 
-import { useTransition } from "react";
+import { useTransition, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { unclaimRide, updateRideStatus } from "@/lib/actions/rides";
+import { unclaimRide, completeRide, updateVolunteerNotes } from "@/lib/actions/rides";
 
 interface RideActionsProps {
   ride: {
@@ -10,15 +10,22 @@ interface RideActionsProps {
     seniorName: string;
     pickupAddress: string;
     destinationAddress: string;
+    facilityName: string | null;
     appointmentDate: Date;
     appointmentTime: string;
     appointmentDuration: string;
     status: string;
+    volunteerNotes: string | null;
   };
 }
 
 export function RideActions({ ride }: RideActionsProps) {
   const [isPending, startTransition] = useTransition();
+  const [showNotes, setShowNotes] = useState(false);
+  const [notes, setNotes] = useState(ride.volunteerNotes || "");
+  const [showComplete, setShowComplete] = useState(false);
+  const [km, setKm] = useState("");
+  const [duration, setDuration] = useState("");
 
   const handleCancel = () => {
     if (!confirm("Are you sure you want to cancel this ride? It will be made available for other volunteers.")) return;
@@ -27,10 +34,20 @@ export function RideActions({ ride }: RideActionsProps) {
     });
   };
 
-  const handleComplete = () => {
-    if (!confirm("Mark this ride as completed?")) return;
+  const handleSaveNotes = () => {
     startTransition(async () => {
-      await updateRideStatus(ride.id, "completed");
+      await updateVolunteerNotes(ride.id, notes);
+      setShowNotes(false);
+    });
+  };
+
+  const handleComplete = () => {
+    startTransition(async () => {
+      await completeRide(ride.id, {
+        kmDriven: km ? parseFloat(km) : undefined,
+        actualDurationMinutes: duration ? parseInt(duration) : undefined,
+      });
+      setShowComplete(false);
     });
   };
 
@@ -50,6 +67,14 @@ export function RideActions({ ride }: RideActionsProps) {
         .replace(/[-:]/g, "")
         .replace(/\.\d{3}/, "");
 
+    const description = [
+      `Pickup: ${ride.pickupAddress}`,
+      ride.facilityName ? `Facility: ${ride.facilityName}` : null,
+      `Destination: ${ride.destinationAddress}`,
+      `Duration: ${ride.appointmentDuration}`,
+      ride.volunteerNotes ? `Notes: ${ride.volunteerNotes}` : null,
+    ].filter(Boolean).join("\\n");
+
     const ics = [
       "BEGIN:VCALENDAR",
       "VERSION:2.0",
@@ -57,9 +82,9 @@ export function RideActions({ ride }: RideActionsProps) {
       "BEGIN:VEVENT",
       `DTSTART:${fmt(start)}`,
       `DTEND:${fmt(end)}`,
-      `SUMMARY:Drive ${ride.seniorName}`,
+      `SUMMARY:Drive ${ride.seniorName}${ride.facilityName ? ` to ${ride.facilityName}` : ""}`,
       `LOCATION:${ride.pickupAddress}`,
-      `DESCRIPTION:Pickup: ${ride.pickupAddress}\\nDestination: ${ride.destinationAddress}\\nDuration: ${ride.appointmentDuration}`,
+      `DESCRIPTION:${description}`,
       "END:VEVENT",
       "END:VCALENDAR",
     ].join("\r\n");
@@ -74,34 +99,104 @@ export function RideActions({ ride }: RideActionsProps) {
   };
 
   return (
-    <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-100">
-      <Button
-        variant="secondary"
-        size="md"
-        onClick={handleDownloadICS}
-      >
-        📅 Add to Calendar
-      </Button>
+    <div className="space-y-3 pt-3 border-t border-gray-100">
+      <div className="flex flex-wrap gap-2">
+        <Button variant="secondary" size="md" onClick={handleDownloadICS}>
+          📅 Add to Calendar
+        </Button>
 
-      {ride.status === "claimed" && (
         <Button
-          variant="success"
+          variant="secondary"
           size="md"
-          onClick={handleComplete}
+          onClick={() => setShowNotes(!showNotes)}
+        >
+          ✏️ {ride.volunteerNotes ? "Edit Notes" : "Add Notes"}
+        </Button>
+
+        {ride.status === "confirmed" && (
+          <Button
+            variant="success"
+            size="md"
+            onClick={() => setShowComplete(!showComplete)}
+            disabled={isPending}
+          >
+            ✓ Complete Ride
+          </Button>
+        )}
+
+        <Button
+          variant="danger"
+          size="md"
+          onClick={handleCancel}
           disabled={isPending}
         >
-          ✓ Mark Completed
+          Cancel
         </Button>
+      </div>
+
+      {showNotes && (
+        <div className="rounded-lg border border-gray-200 p-3 space-y-2">
+          <label className="block text-sm font-medium text-gray-700">
+            Pickup notes (e.g., &quot;Pick up at P1 elevator at 12:10&quot;)
+          </label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={3}
+            className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            placeholder="Add details after calling the client..."
+          />
+          <div className="flex gap-2">
+            <Button size="sm" onClick={handleSaveNotes} disabled={isPending}>
+              {isPending ? "Saving..." : "Save Notes"}
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => setShowNotes(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
       )}
 
-      <Button
-        variant="danger"
-        size="md"
-        onClick={handleCancel}
-        disabled={isPending}
-      >
-        Cancel My Claim
-      </Button>
+      {showComplete && (
+        <div className="rounded-lg border border-gray-200 p-3 space-y-3">
+          <p className="text-sm font-medium text-gray-700">Log trip details (optional, for invoicing)</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Kilometers driven
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                value={km}
+                onChange={(e) => setKm(e.target.value)}
+                className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                placeholder="e.g., 25.5"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Actual duration (minutes)
+              </label>
+              <input
+                type="number"
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+                className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                placeholder="e.g., 90"
+              />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" variant="success" onClick={handleComplete} disabled={isPending}>
+              {isPending ? "Completing..." : "Mark Completed"}
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => setShowComplete(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

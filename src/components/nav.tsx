@@ -18,10 +18,11 @@ export function Nav({ session }: NavProps) {
   const links = isAdmin
     ? [
         { href: "/admin", label: "Dashboard" },
+        { href: "/admin/clients", label: "Clients" },
         { href: "/admin/rides/new", label: "New Ride" },
       ]
     : [
-        { href: "/rides", label: "Available Rides" },
+        { href: "/rides", label: "Open Rides" },
         { href: "/my-rides", label: "My Rides" },
         { href: "/settings", label: "Settings" },
       ];

@@ -7,16 +7,9 @@ import {
   ZoneBadge,
 } from "@/components/ride-badges";
 import { ZoneFilter } from "./zone-filter";
-import { ClaimButton } from "./claim-button";
-import { suggestZone, type ZoneValue } from "@/lib/zones";
+import { AcceptButton } from "./accept-button";
+import { type ZoneValue } from "@/lib/zones";
 import { type Prisma } from "@/generated/prisma/client";
-
-const ZONE_LABELS: Record<string, string> = {
-  north_van: "North Van",
-  west_van: "West Van",
-  downtown_van: "Downtown Van",
-  other: "Other",
-};
 
 export default async function RideBoardPage({
   searchParams,
@@ -27,19 +20,37 @@ export default async function RideBoardPage({
   const session = await auth();
   const zoneFilter = params.zone || "all";
 
-  const where: Prisma.RideWhereInput = { status: "available" };
+  const where: Prisma.RideWhereInput = { status: "open" };
   if (zoneFilter !== "all") {
     where.zone = zoneFilter as ZoneValue;
   }
 
+  if (!session?.user) return null;
+
   const rides = await prisma.ride.findMany({
     where,
+    include: { client: true },
     orderBy: { appointmentDate: "asc" },
   });
 
+  const volunteer = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { address: true },
+  });
+
+  const mapsRouteUrl = (pickupAddress: string, destAddress: string) => {
+    const origin = volunteer?.address ? encodeURIComponent(volunteer.address) : "";
+    const waypoint = encodeURIComponent(pickupAddress);
+    const dest = encodeURIComponent(destAddress);
+    if (origin) {
+      return `https://www.google.com/maps/dir/?api=1&origin=${origin}&waypoints=${waypoint}&destination=${dest}`;
+    }
+    return `https://www.google.com/maps/dir/?api=1&origin=${waypoint}&destination=${dest}`;
+  };
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Available Rides</h1>
+      <h1 className="text-2xl font-bold text-gray-900">Open Rides</h1>
 
       <ZoneFilter currentZone={zoneFilter} />
 
@@ -55,12 +66,15 @@ export default async function RideBoardPage({
       ) : (
         <div className="space-y-4">
           {rides.map((ride) => {
-            const destZone = suggestZone(ride.destinationAddress);
             return (
               <Card key={ride.id} className="p-5">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="space-y-2 flex-1">
                     <p className="text-xl font-bold text-gray-900">
+                      {ride.seniorName}
+                    </p>
+
+                    <p className="text-base font-medium text-gray-800">
                       {new Date(ride.appointmentDate).toLocaleDateString("en-US", {
                         weekday: "long",
                         month: "long",
@@ -69,9 +83,18 @@ export default async function RideBoardPage({
                       at {ride.appointmentTime}
                     </p>
 
-                    <p className="text-base text-gray-700">
-                      {ZONE_LABELS[ride.zone]} → {ZONE_LABELS[destZone] || "Other"}
-                    </p>
+                    <div className="text-sm text-gray-600 space-y-1">
+                      <p>
+                        <span className="font-medium text-gray-700">Pickup:</span>{" "}
+                        {ride.pickupAddress}
+                      </p>
+                      <p>
+                        <span className="font-medium text-gray-700">
+                          {ride.facilityName ? `${ride.facilityName}:` : "Drop-off:"}
+                        </span>{" "}
+                        {ride.destinationAddress}
+                      </p>
+                    </div>
 
                     <div className="flex flex-wrap items-center gap-2">
                       <TripTypeBadge tripType={ride.tripType} />
@@ -86,12 +109,21 @@ export default async function RideBoardPage({
                       mobilityAidNotes={ride.mobilityAidNotes}
                       assistanceInOut={ride.assistanceInOut}
                     />
+
+                    <a
+                      href={mapsRouteUrl(ride.pickupAddress, ride.destinationAddress)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
+                    >
+                      📍 View Route in Maps
+                    </a>
                   </div>
 
                   <div className="sm:self-center">
-                    <ClaimButton
+                    <AcceptButton
                       rideId={ride.id}
-                      userId={session!.user.id}
+                      userId={session.user.id}
                     />
                   </div>
                 </div>

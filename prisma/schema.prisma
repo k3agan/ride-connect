@@ -34,18 +34,20 @@ enum Zone {
 }
 
 enum RideStatus {
-  available
-  claimed
-  in_progress
+  open
+  booked
+  confirmed
   completed
-  cancelled
+  deleted
 }
 
 enum NotificationType {
   new_ride
-  confirmation
+  ride_booked
+  ride_confirmed
   cancellation
   reminder
+  call_reminder
 }
 
 enum NotificationChannel {
@@ -64,6 +66,8 @@ model User {
   email          String   @unique
   name           String
   phone          String?
+  address        String?
+  pictureUrl     String?  @map("picture_url")
   role           Role
   preferredZones Zone[]   @default([])
   createdAt      DateTime @default(now()) @map("created_at")
@@ -81,6 +85,23 @@ model User {
   notifications  Notification[]
 
   @@map("users")
+}
+
+model Client {
+  id              String   @id @default(uuid()) @db.Uuid
+  name            String
+  address         String
+  phone           String
+  mobilityAid     MobilityAid @default(none) @map("mobility_aid")
+  assistanceInOut Boolean     @default(false) @map("assistance_in_out")
+  generalNotes    String?     @map("general_notes")
+  pictureUrl      String?     @map("picture_url")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  rides Ride[]
+
+  @@map("clients")
 }
 
 model Account {
@@ -125,9 +146,16 @@ model VerificationToken {
 
 model Ride {
   id                  String     @id @default(uuid()) @db.Uuid
+
+  clientId            String?    @map("client_id") @db.Uuid
+  client              Client?    @relation(fields: [clientId], references: [id])
+
+  // Kept for backward compat with pre-client rides; new rides populate via client relation
   seniorName          String     @map("senior_name")
   seniorPhone         String     @map("senior_phone")
+
   pickupAddress       String     @map("pickup_address")
+  facilityName        String?    @map("facility_name")
   destinationAddress  String     @map("destination_address")
   appointmentDate     DateTime   @map("appointment_date") @db.Date
   appointmentTime     String     @map("appointment_time")
@@ -137,8 +165,11 @@ model Ride {
   mobilityAidNotes    String?    @map("mobility_aid_notes")
   assistanceInOut     Boolean    @default(false) @map("assistance_in_out")
   zone                Zone
-  status              RideStatus @default(available)
+  status              RideStatus @default(open)
   notes               String?
+  volunteerNotes      String?    @map("volunteer_notes")
+  kmDriven            Float?     @map("km_driven")
+  actualDurationMinutes Int?     @map("actual_duration_minutes")
   recurringGroupId    String?    @map("recurring_group_id") @db.Uuid
   version             Int        @default(1)
 
@@ -148,6 +179,8 @@ model Ride {
   claimedById         String?    @map("claimed_by") @db.Uuid
   claimedBy           User?      @relation("ClaimedRides", fields: [claimedById], references: [id])
   claimedAt           DateTime?  @map("claimed_at")
+  confirmedAt         DateTime?  @map("confirmed_at")
+  completedAt         DateTime?  @map("completed_at")
 
   createdAt           DateTime   @default(now()) @map("created_at")
   updatedAt           DateTime   @updatedAt @map("updated_at")

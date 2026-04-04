@@ -4,7 +4,7 @@ import { type Ride } from "@/generated/prisma/client";
 
 const ZONE_LABELS: Record<string, string> = {
   north_van: "North Van",
-  west_van: "Downtown Van",
+  west_van: "West Van",
   downtown_van: "Downtown Van",
   other: "Other",
 };
@@ -17,10 +17,12 @@ function formatDate(date: Date): string {
   });
 }
 
+const baseUrl = () => process.env.AUTH_URL || "http://localhost:3000";
+
 export async function notifyNewRide(ride: Ride) {
   const volunteers = await prisma.user.findMany({
     where: { role: "volunteer" },
-    select: { email: true },
+    select: { email: true, id: true },
   });
 
   if (volunteers.length === 0) return;
@@ -38,13 +40,14 @@ export async function notifyNewRide(ride: Ride) {
         <table style="border-collapse: collapse; width: 100%;">
           <tr><td style="padding: 8px; font-weight: bold;">Date</td><td style="padding: 8px;">${formatDate(ride.appointmentDate)} at ${ride.appointmentTime}</td></tr>
           <tr><td style="padding: 8px; font-weight: bold;">Zone</td><td style="padding: 8px;">${zoneName}</td></tr>
-          <tr><td style="padding: 8px; font-weight: bold;">Trip Type</td><td style="padding: 8px;">${ride.tripType.replace(/_/g, " ")}</td></tr>
+          <tr><td style="padding: 8px; font-weight: bold;">Client</td><td style="padding: 8px;">${ride.seniorName}</td></tr>
+          ${ride.facilityName ? `<tr><td style="padding: 8px; font-weight: bold;">Facility</td><td style="padding: 8px;">${ride.facilityName}</td></tr>` : ""}
           <tr><td style="padding: 8px; font-weight: bold;">Duration</td><td style="padding: 8px;">${ride.appointmentDuration}</td></tr>
         </table>
         <p style="margin-top: 16px;">
-          <a href="${process.env.AUTH_URL || "http://localhost:3000"}/rides" 
+          <a href="${baseUrl()}/rides"
              style="background: #16a34a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-size: 16px;">
-            View & Claim Ride
+            View & Accept Ride
           </a>
         </p>
         <p style="color: #6b7280; font-size: 12px; margin-top: 24px;">
@@ -57,7 +60,7 @@ export async function notifyNewRide(ride: Ride) {
   for (const v of volunteers) {
     await prisma.notification.create({
       data: {
-        userId: (await prisma.user.findUnique({ where: { email: v.email } }))!.id,
+        userId: v.id,
         rideId: ride.id,
         type: "new_ride",
         channel: "email",
@@ -68,54 +71,26 @@ export async function notifyNewRide(ride: Ride) {
   }
 }
 
-export async function notifyRideClaimed(ride: Ride, volunteerEmail: string) {
-  await sendEmail({
-    to: volunteerEmail,
-    subject: `Ride confirmed: ${ride.seniorName} — ${formatDate(ride.appointmentDate)}`,
-    html: `
-      <div style="font-family: sans-serif; max-width: 500px;">
-        <h2 style="color: #16a34a;">Ride Confirmed!</h2>
-        <p>You've successfully claimed this ride:</p>
-        <table style="border-collapse: collapse; width: 100%;">
-          <tr><td style="padding: 8px; font-weight: bold;">Senior</td><td style="padding: 8px;">${ride.seniorName}</td></tr>
-          <tr><td style="padding: 8px; font-weight: bold;">Phone</td><td style="padding: 8px;"><a href="tel:${ride.seniorPhone}">${ride.seniorPhone}</a></td></tr>
-          <tr><td style="padding: 8px; font-weight: bold;">Date</td><td style="padding: 8px;">${formatDate(ride.appointmentDate)} at ${ride.appointmentTime}</td></tr>
-          <tr><td style="padding: 8px; font-weight: bold;">Pickup</td><td style="padding: 8px;">${ride.pickupAddress}</td></tr>
-          <tr><td style="padding: 8px; font-weight: bold;">Destination</td><td style="padding: 8px;">${ride.destinationAddress}</td></tr>
-          <tr><td style="padding: 8px; font-weight: bold;">Duration</td><td style="padding: 8px;">${ride.appointmentDuration}</td></tr>
-        </table>
-        <p style="margin-top: 16px;">
-          <a href="${process.env.AUTH_URL || "http://localhost:3000"}/my-rides"
-             style="background: #1d4ed8; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-size: 16px;">
-            View My Rides
-          </a>
-        </p>
-      </div>
-    `,
-  });
-
-  // Also notify staff
+export async function notifyRideBooked(ride: Ride, volunteerName: string) {
   const admins = await prisma.user.findMany({
     where: { role: "admin" },
     select: { email: true },
   });
 
   if (admins.length > 0) {
-    const volunteer = await prisma.user.findUnique({
-      where: { email: volunteerEmail },
-      select: { name: true },
-    });
-
     await sendEmail({
       to: admins.map((a) => a.email),
-      subject: `Ride claimed: ${ride.seniorName} — ${volunteer?.name || volunteerEmail}`,
+      subject: `Ride booked — ${ride.seniorName} — needs your confirmation`,
       html: `
         <div style="font-family: sans-serif; max-width: 500px;">
-          <h2 style="color: #1d4ed8;">Ride Claimed</h2>
-          <p><strong>${volunteer?.name || volunteerEmail}</strong> has claimed the ride for <strong>${ride.seniorName}</strong> on ${formatDate(ride.appointmentDate)} at ${ride.appointmentTime}.</p>
-          <p>
-            <a href="${process.env.AUTH_URL || "http://localhost:3000"}/admin/rides/${ride.id}"
-               style="color: #1d4ed8;">View ride details →</a>
+          <h2 style="color: #d97706;">Ride Booked — Action Needed</h2>
+          <p><strong>${volunteerName}</strong> has accepted the ride for <strong>${ride.seniorName}</strong> on ${formatDate(ride.appointmentDate)} at ${ride.appointmentTime}.</p>
+          <p>Please call the client to confirm and then mark the ride as confirmed in the system.</p>
+          <p style="margin-top: 16px;">
+            <a href="${baseUrl()}/admin/rides/${ride.id}"
+               style="background: #d97706; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-size: 16px;">
+              Confirm Ride
+            </a>
           </p>
         </div>
       `,
@@ -123,8 +98,45 @@ export async function notifyRideClaimed(ride: Ride, volunteerEmail: string) {
   }
 }
 
+export async function notifyRideConfirmed(ride: Ride, volunteerId: string) {
+  const volunteer = await prisma.user.findUnique({
+    where: { id: volunteerId },
+    select: { email: true, name: true },
+  });
+
+  if (!volunteer) return;
+
+  await sendEmail({
+    to: volunteer.email,
+    subject: `Ride confirmed: ${ride.seniorName} — ${formatDate(ride.appointmentDate)}`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 500px;">
+        <h2 style="color: #16a34a;">Ride Confirmed!</h2>
+        <p>Your ride has been officially confirmed by the coordinator:</p>
+        <table style="border-collapse: collapse; width: 100%;">
+          <tr><td style="padding: 8px; font-weight: bold;">Client</td><td style="padding: 8px;">${ride.seniorName}</td></tr>
+          <tr><td style="padding: 8px; font-weight: bold;">Phone</td><td style="padding: 8px;"><a href="tel:${ride.seniorPhone}">${ride.seniorPhone}</a></td></tr>
+          <tr><td style="padding: 8px; font-weight: bold;">Date</td><td style="padding: 8px;">${formatDate(ride.appointmentDate)} at ${ride.appointmentTime}</td></tr>
+          <tr><td style="padding: 8px; font-weight: bold;">Pickup</td><td style="padding: 8px;">${ride.pickupAddress}</td></tr>
+          ${ride.facilityName ? `<tr><td style="padding: 8px; font-weight: bold;">Facility</td><td style="padding: 8px;">${ride.facilityName}</td></tr>` : ""}
+          <tr><td style="padding: 8px; font-weight: bold;">Destination</td><td style="padding: 8px;">${ride.destinationAddress}</td></tr>
+          <tr><td style="padding: 8px; font-weight: bold;">Duration</td><td style="padding: 8px;">${ride.appointmentDuration}</td></tr>
+        </table>
+        <p style="margin-top: 12px; color: #6b7280;">
+          Remember to call the client 2 days before to discuss pickup details.
+        </p>
+        <p style="margin-top: 16px;">
+          <a href="${baseUrl()}/my-rides"
+             style="background: #1d4ed8; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-size: 16px;">
+            View My Rides
+          </a>
+        </p>
+      </div>
+    `,
+  });
+}
+
 export async function notifyRideCancelled(ride: Ride, cancelledByName: string) {
-  // Notify staff
   const admins = await prisma.user.findMany({
     where: { role: "admin" },
     select: { email: true },
@@ -133,14 +145,14 @@ export async function notifyRideCancelled(ride: Ride, cancelledByName: string) {
   if (admins.length > 0) {
     await sendEmail({
       to: admins.map((a) => a.email),
-      subject: `Ride unclaimed: ${ride.seniorName} — ${formatDate(ride.appointmentDate)}`,
+      subject: `Ride cancelled: ${ride.seniorName} — ${formatDate(ride.appointmentDate)}`,
       html: `
         <div style="font-family: sans-serif; max-width: 500px;">
-          <h2 style="color: #dc2626;">Ride Unclaimed</h2>
+          <h2 style="color: #dc2626;">Ride Cancelled</h2>
           <p><strong>${cancelledByName}</strong> has cancelled their claim on the ride for <strong>${ride.seniorName}</strong> on ${formatDate(ride.appointmentDate)} at ${ride.appointmentTime}.</p>
-          <p>This ride is now available again for other volunteers.</p>
+          <p>This ride is now open again for other volunteers.</p>
           <p>
-            <a href="${process.env.AUTH_URL || "http://localhost:3000"}/admin/rides/${ride.id}"
+            <a href="${baseUrl()}/admin/rides/${ride.id}"
                style="color: #1d4ed8;">View ride details →</a>
           </p>
         </div>
@@ -148,7 +160,6 @@ export async function notifyRideCancelled(ride: Ride, cancelledByName: string) {
     });
   }
 
-  // Re-notify volunteers that it's available
   const volunteers = await prisma.user.findMany({
     where: { role: "volunteer" },
     select: { email: true },
@@ -162,22 +173,58 @@ export async function notifyRideCancelled(ride: Ride, cancelledByName: string) {
       html: `
         <div style="font-family: sans-serif; max-width: 500px;">
           <h2 style="color: #1d4ed8;">Ride Available Again</h2>
-          <p>A previously claimed ride is now available:</p>
+          <p>A previously booked ride is now available:</p>
           <table style="border-collapse: collapse; width: 100%;">
             <tr><td style="padding: 8px; font-weight: bold;">Date</td><td style="padding: 8px;">${formatDate(ride.appointmentDate)} at ${ride.appointmentTime}</td></tr>
             <tr><td style="padding: 8px; font-weight: bold;">Zone</td><td style="padding: 8px;">${zoneName}</td></tr>
             <tr><td style="padding: 8px; font-weight: bold;">Duration</td><td style="padding: 8px;">${ride.appointmentDuration}</td></tr>
           </table>
           <p style="margin-top: 16px;">
-            <a href="${process.env.AUTH_URL || "http://localhost:3000"}/rides"
+            <a href="${baseUrl()}/rides"
                style="background: #16a34a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-size: 16px;">
-              View & Claim Ride
+              View & Accept Ride
             </a>
           </p>
         </div>
       `,
     });
   }
+}
+
+export async function notifyCallReminder(ride: Ride) {
+  if (!ride.claimedById) return;
+
+  const volunteer = await prisma.user.findUnique({
+    where: { id: ride.claimedById },
+    select: { email: true, name: true },
+  });
+
+  if (!volunteer) return;
+
+  await sendEmail({
+    to: volunteer.email,
+    subject: `Reminder: Call ${ride.seniorName} to discuss pickup — ${formatDate(ride.appointmentDate)}`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 500px;">
+        <h2 style="color: #d97706;">Time to Call Your Client</h2>
+        <p>Hi ${volunteer.name},</p>
+        <p>Your ride for <strong>${ride.seniorName}</strong> is in 2 days. Please call them to discuss pickup details.</p>
+        <table style="border-collapse: collapse; width: 100%;">
+          <tr><td style="padding: 8px; font-weight: bold;">Client</td><td style="padding: 8px;">${ride.seniorName}</td></tr>
+          <tr><td style="padding: 8px; font-weight: bold;">Phone</td><td style="padding: 8px;"><a href="tel:${ride.seniorPhone}">${ride.seniorPhone}</a></td></tr>
+          <tr><td style="padding: 8px; font-weight: bold;">Date</td><td style="padding: 8px;">${formatDate(ride.appointmentDate)} at ${ride.appointmentTime}</td></tr>
+          <tr><td style="padding: 8px; font-weight: bold;">Pickup</td><td style="padding: 8px;">${ride.pickupAddress}</td></tr>
+        </table>
+        <p style="margin-top: 8px; color: #6b7280;">After calling, you can add pickup notes in "My Rides" (e.g., exact meeting point, elevator location).</p>
+        <p style="margin-top: 16px;">
+          <a href="${baseUrl()}/my-rides"
+             style="background: #1d4ed8; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-size: 16px;">
+            View My Rides
+          </a>
+        </p>
+      </div>
+    `,
+  });
 }
 
 export async function notifyRideReminder(ride: Ride) {
@@ -199,14 +246,14 @@ export async function notifyRideReminder(ride: Ride) {
         <p>Hi ${volunteer.name},</p>
         <p>This is a reminder about your upcoming ride:</p>
         <table style="border-collapse: collapse; width: 100%;">
-          <tr><td style="padding: 8px; font-weight: bold;">Senior</td><td style="padding: 8px;">${ride.seniorName}</td></tr>
+          <tr><td style="padding: 8px; font-weight: bold;">Client</td><td style="padding: 8px;">${ride.seniorName}</td></tr>
           <tr><td style="padding: 8px; font-weight: bold;">Phone</td><td style="padding: 8px;"><a href="tel:${ride.seniorPhone}">${ride.seniorPhone}</a></td></tr>
           <tr><td style="padding: 8px; font-weight: bold;">Date</td><td style="padding: 8px;">${formatDate(ride.appointmentDate)} at ${ride.appointmentTime}</td></tr>
           <tr><td style="padding: 8px; font-weight: bold;">Pickup</td><td style="padding: 8px;">${ride.pickupAddress}</td></tr>
           <tr><td style="padding: 8px; font-weight: bold;">Destination</td><td style="padding: 8px;">${ride.destinationAddress}</td></tr>
         </table>
         <p style="margin-top: 16px;">
-          <a href="${process.env.AUTH_URL || "http://localhost:3000"}/my-rides"
+          <a href="${baseUrl()}/my-rides"
              style="background: #1d4ed8; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-size: 16px;">
             View My Rides
           </a>

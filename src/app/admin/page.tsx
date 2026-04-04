@@ -20,12 +20,15 @@ export default async function AdminDashboard({
 
   const where =
     statusFilter === "all"
-      ? {}
-      : { status: statusFilter as "available" | "claimed" | "in_progress" | "completed" | "cancelled" };
+      ? { status: { not: "deleted" as const } }
+      : { status: statusFilter as "open" | "booked" | "confirmed" | "completed" | "deleted" };
 
   const rides = await prisma.ride.findMany({
     where,
-    include: { claimedBy: { select: { name: true, email: true } } },
+    include: {
+      claimedBy: { select: { name: true, email: true } },
+      client: { select: { name: true, phone: true } },
+    },
     orderBy: { appointmentDate: "asc" },
   });
 
@@ -42,20 +45,25 @@ export default async function AdminDashboard({
 
   const filters = [
     { value: "all", label: `All (${total})` },
-    { value: "available", label: `Available (${countMap["available"] || 0})` },
-    { value: "claimed", label: `Claimed (${countMap["claimed"] || 0})` },
-    { value: "in_progress", label: `In Progress (${countMap["in_progress"] || 0})` },
+    { value: "open", label: `Open (${countMap["open"] || 0})` },
+    { value: "booked", label: `Booked (${countMap["booked"] || 0})` },
+    { value: "confirmed", label: `Confirmed (${countMap["confirmed"] || 0})` },
     { value: "completed", label: `Completed (${countMap["completed"] || 0})` },
-    { value: "cancelled", label: `Cancelled (${countMap["cancelled"] || 0})` },
+    { value: "deleted", label: `Deleted (${countMap["deleted"] || 0})` },
   ];
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-        <Link href="/admin/rides/new">
-          <Button size="lg">+ New Ride Request</Button>
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/admin/clients">
+            <Button variant="secondary" size="lg">Manage Clients</Button>
+          </Link>
+          <Link href="/admin/rides/new">
+            <Button size="lg">+ New Ride Request</Button>
+          </Link>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -81,7 +89,10 @@ export default async function AdminDashboard({
       ) : (
         <div className="space-y-3">
           {rides.map((ride) => (
-            <Card key={ride.id} className="p-5">
+            <Card
+              key={ride.id}
+              className={`p-5 ${ride.status === "booked" ? "ring-2 ring-amber-400 bg-amber-50/30" : ""}`}
+            >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="space-y-2 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
@@ -92,6 +103,12 @@ export default async function AdminDashboard({
                     <TripTypeBadge tripType={ride.tripType} />
                     <ZoneBadge zone={ride.zone} />
                   </div>
+
+                  {ride.status === "booked" && (
+                    <p className="text-sm font-medium text-amber-700">
+                      ⚠ Action needed: Call client and confirm this ride
+                    </p>
+                  )}
 
                   <div className="grid gap-1 text-sm text-gray-600">
                     <p>
@@ -107,7 +124,9 @@ export default async function AdminDashboard({
                       <span className="font-medium">From:</span> {ride.pickupAddress}
                     </p>
                     <p>
-                      <span className="font-medium">To:</span> {ride.destinationAddress}
+                      <span className="font-medium">To:</span>{" "}
+                      {ride.facilityName ? `${ride.facilityName} — ` : ""}
+                      {ride.destinationAddress}
                     </p>
                     <p>
                       <span className="font-medium">Duration:</span>{" "}
