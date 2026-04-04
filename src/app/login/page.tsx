@@ -21,7 +21,7 @@ export default async function LoginPage() {
 
         <LoginForm />
 
-        {process.env.NODE_ENV !== "production" && (
+        {(process.env.NODE_ENV !== "production" || process.env.DEMO_MODE) && (
           <div className="rounded-lg border-2 border-dashed border-amber-300 bg-amber-50 p-4 space-y-2">
             <p className="text-sm font-semibold text-amber-800">
               Dev Mode — Quick Login

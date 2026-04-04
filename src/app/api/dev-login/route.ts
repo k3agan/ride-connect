@@ -10,8 +10,8 @@ import { v4 as uuidv4 } from "uuid";
  * Usage: GET /api/dev-login?email=coordinator@example.org
  */
 export async function GET(request: Request) {
-  if (process.env.NODE_ENV === "production") {
-    return NextResponse.json({ error: "Not available in production" }, { status: 403 });
+  if (process.env.NODE_ENV === "production" && !process.env.DEMO_MODE) {
+    return NextResponse.json({ error: "Not available" }, { status: 403 });
   }
 
   const url = new URL(request.url);
