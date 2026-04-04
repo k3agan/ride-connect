@@ -1,0 +1,187 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  admin
+  volunteer
+}
+
+enum TripType {
+  one_way
+  round_trip
+  one_way_possible
+}
+
+enum MobilityAid {
+  none
+  walker
+  cane
+  wheelchair
+  other
+}
+
+enum Zone {
+  north_van
+  west_van
+  downtown_van
+  other
+}
+
+enum RideStatus {
+  available
+  claimed
+  in_progress
+  completed
+  cancelled
+}
+
+enum NotificationType {
+  new_ride
+  confirmation
+  cancellation
+  reminder
+}
+
+enum NotificationChannel {
+  email
+  sms
+}
+
+enum NotificationStatus {
+  pending
+  sent
+  failed
+}
+
+model User {
+  id             String   @id @default(uuid()) @db.Uuid
+  email          String   @unique
+  name           String
+  phone          String?
+  role           Role
+  preferredZones Zone[]   @default([])
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  // NextAuth fields
+  emailVerified DateTime? @map("email_verified")
+  image         String?
+
+  accounts      Account[]
+  sessions      Session[]
+
+  createdRides   Ride[]         @relation("CreatedRides")
+  claimedRides   Ride[]         @relation("ClaimedRides")
+  auditActions   RideAuditLog[]
+  notifications  Notification[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(uuid()) @db.Uuid
+  userId            String  @map("user_id") @db.Uuid
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(uuid()) @db.Uuid
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id") @db.Uuid
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model Ride {
+  id                  String     @id @default(uuid()) @db.Uuid
+  seniorName          String     @map("senior_name")
+  seniorPhone         String     @map("senior_phone")
+  pickupAddress       String     @map("pickup_address")
+  destinationAddress  String     @map("destination_address")
+  appointmentDate     DateTime   @map("appointment_date") @db.Date
+  appointmentTime     String     @map("appointment_time")
+  appointmentDuration String     @map("appointment_duration")
+  tripType            TripType   @default(round_trip) @map("trip_type")
+  mobilityAid         MobilityAid @default(none) @map("mobility_aid")
+  mobilityAidNotes    String?    @map("mobility_aid_notes")
+  assistanceInOut     Boolean    @default(false) @map("assistance_in_out")
+  zone                Zone
+  status              RideStatus @default(available)
+  notes               String?
+  recurringGroupId    String?    @map("recurring_group_id") @db.Uuid
+  version             Int        @default(1)
+
+  createdById         String?    @map("created_by") @db.Uuid
+  createdBy           User?      @relation("CreatedRides", fields: [createdById], references: [id])
+
+  claimedById         String?    @map("claimed_by") @db.Uuid
+  claimedBy           User?      @relation("ClaimedRides", fields: [claimedById], references: [id])
+  claimedAt           DateTime?  @map("claimed_at")
+
+  createdAt           DateTime   @default(now()) @map("created_at")
+  updatedAt           DateTime   @updatedAt @map("updated_at")
+
+  auditLog      RideAuditLog[]
+  notifications Notification[]
+
+  @@map("rides")
+}
+
+model RideAuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  rideId    String   @map("ride_id") @db.Uuid
+  ride      Ride     @relation(fields: [rideId], references: [id])
+  actorId   String?  @map("actor_id") @db.Uuid
+  actor     User?    @relation(fields: [actorId], references: [id])
+  action    String
+  oldValues Json?    @map("old_values")
+  newValues Json?    @map("new_values")
+  timestamp DateTime @default(now())
+
+  @@map("ride_audit_log")
+}
+
+model Notification {
+  id      String             @id @default(uuid()) @db.Uuid
+  userId  String             @map("user_id") @db.Uuid
+  user    User               @relation(fields: [userId], references: [id])
+  rideId  String?            @map("ride_id") @db.Uuid
+  ride    Ride?              @relation(fields: [rideId], references: [id])
+  type    NotificationType
+  channel NotificationChannel
+  sentAt  DateTime?          @map("sent_at")
+  status  NotificationStatus @default(pending)
+
+  @@map("notifications")
+}
