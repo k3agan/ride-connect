@@ -37,11 +37,17 @@ export async function GET(request: Request) {
     },
   });
 
+  const useSecureCookie = request.url.startsWith("https://");
+  const cookieName = useSecureCookie
+    ? "__Secure-authjs.session-token"
+    : "authjs.session-token";
+
   const cookieStore = await cookies();
-  cookieStore.set("authjs.session-token", sessionToken, {
+  cookieStore.set(cookieName, sessionToken, {
     expires,
     httpOnly: true,
     sameSite: "lax",
+    secure: useSecureCookie,
     path: "/",
   });
 
