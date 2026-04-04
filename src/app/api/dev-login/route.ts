@@ -37,7 +37,9 @@ export async function GET(request: Request) {
     },
   });
 
-  const useSecureCookie = request.url.startsWith("https://");
+  const forwardedProto = request.headers.get("x-forwarded-proto");
+  const useSecureCookie =
+    request.url.startsWith("https://") || forwardedProto === "https";
   const cookieName = useSecureCookie
     ? "__Secure-authjs.session-token"
     : "authjs.session-token";
