@@ -46,7 +46,7 @@ async function main() {
   // Client master data
   const barbara = await prisma.client.upsert({
     where: { id: "00000000-0000-0000-0000-000000000001" },
-    update: {},
+    update: { pictureUrl: "/seed/barbara.jpg" },
     create: {
       id: "00000000-0000-0000-0000-000000000001",
       name: "Barbara Sidelmann",
@@ -54,12 +54,13 @@ async function main() {
       phone: "(604) 985-0907",
       mobilityAid: "none",
       assistanceInOut: false,
+      pictureUrl: "/seed/barbara.jpg",
     },
   });
 
   const jill = await prisma.client.upsert({
     where: { id: "00000000-0000-0000-0000-000000000002" },
-    update: {},
+    update: { pictureUrl: "/seed/jill.jpg" },
     create: {
       id: "00000000-0000-0000-0000-000000000002",
       name: "Jill Sangster",
@@ -68,12 +69,13 @@ async function main() {
       mobilityAid: "walker",
       assistanceInOut: false,
       generalNotes: "Visual impairment",
+      pictureUrl: "/seed/jill.jpg",
     },
   });
 
   const bobi = await prisma.client.upsert({
     where: { id: "00000000-0000-0000-0000-000000000003" },
-    update: {},
+    update: { pictureUrl: "/seed/bobi.jpg" },
     create: {
       id: "00000000-0000-0000-0000-000000000003",
       name: "Bobi Lukacs",
@@ -82,6 +84,7 @@ async function main() {
       mobilityAid: "walker",
       assistanceInOut: true,
       generalNotes: "Speech impediment",
+      pictureUrl: "/seed/bobi.jpg",
     },
   });
 

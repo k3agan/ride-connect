@@ -10,6 +10,7 @@ import { ZoneFilter } from "./zone-filter";
 import { AcceptButton } from "./accept-button";
 import { type ZoneValue } from "@/lib/zones";
 import { type Prisma } from "@/generated/prisma/client";
+import { Avatar } from "@/components/avatar";
 
 export default async function RideBoardPage({
   searchParams,
@@ -70,9 +71,12 @@ export default async function RideBoardPage({
               <Card key={ride.id} className="p-5">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="space-y-2 flex-1">
-                    <p className="text-xl font-bold text-gray-900">
-                      {ride.seniorName}
-                    </p>
+                    <div className="flex items-center gap-3">
+                      <Avatar src={ride.client?.pictureUrl} name={ride.seniorName} size="md" />
+                      <p className="text-xl font-bold text-gray-900">
+                        {ride.seniorName}
+                      </p>
+                    </div>
 
                     <p className="text-base font-medium text-gray-800">
                       {new Date(ride.appointmentDate).toLocaleDateString("en-US", {

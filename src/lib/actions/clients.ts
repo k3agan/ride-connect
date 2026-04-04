@@ -13,6 +13,7 @@ interface ClientInput {
   mobilityAid: MobilityAid;
   assistanceInOut: boolean;
   generalNotes: string;
+  pictureUrl?: string | null;
 }
 
 export async function createClient(input: ClientInput) {
@@ -29,6 +30,7 @@ export async function createClient(input: ClientInput) {
       mobilityAid: input.mobilityAid,
       assistanceInOut: input.assistanceInOut,
       generalNotes: input.generalNotes || null,
+      pictureUrl: input.pictureUrl ?? undefined,
     },
   });
 
@@ -51,6 +53,7 @@ export async function updateClient(clientId: string, input: ClientInput) {
       mobilityAid: input.mobilityAid,
       assistanceInOut: input.assistanceInOut,
       generalNotes: input.generalNotes || null,
+      pictureUrl: input.pictureUrl ?? undefined,
     },
   });
 

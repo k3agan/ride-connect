@@ -8,6 +8,7 @@ import {
   ZoneBadge,
 } from "@/components/ride-badges";
 import { AdminRideActions } from "../../ride-actions";
+import { Avatar } from "@/components/avatar";
 
 export default async function RideDetailPage({
   params,
@@ -58,7 +59,10 @@ export default async function RideDetailPage({
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-3">
-                <h3 className="font-semibold text-gray-900">Client</h3>
+                <div className="flex items-center gap-3">
+                  <Avatar src={ride.client?.pictureUrl} name={ride.seniorName} size="lg" />
+                  <h3 className="font-semibold text-gray-900">Client</h3>
+                </div>
                 <dl className="space-y-1 text-sm text-gray-600">
                   <div>
                     <dt className="font-medium inline">Name:</dt>{" "}

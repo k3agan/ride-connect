@@ -7,6 +7,7 @@ import { Select } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
+import { ImageUpload } from "@/components/image-upload";
 type MobilityAid = "none" | "walker" | "cane" | "wheelchair" | "other";
 
 const MOBILITY_OPTIONS = [
@@ -26,6 +27,7 @@ interface ClientFormProps {
     mobilityAid: MobilityAid;
     assistanceInOut: boolean;
     generalNotes: string | null;
+    pictureUrl: string | null;
   };
 }
 
@@ -33,6 +35,7 @@ export function ClientForm({ client }: ClientFormProps) {
   const isEditing = !!client;
   const [mobilityAid, setMobilityAid] = useState<MobilityAid>(client?.mobilityAid || "none");
   const [assistanceInOut, setAssistanceInOut] = useState(client?.assistanceInOut || false);
+  const [pictureUrl, setPictureUrl] = useState<string | null>(client?.pictureUrl ?? null);
 
   async function handleSubmit(_prev: unknown, formData: FormData) {
     const input = {
@@ -42,6 +45,7 @@ export function ClientForm({ client }: ClientFormProps) {
       mobilityAid: formData.get("mobilityAid") as MobilityAid,
       assistanceInOut,
       generalNotes: formData.get("generalNotes") as string,
+      pictureUrl,
     };
 
     try {
@@ -64,6 +68,8 @@ export function ClientForm({ client }: ClientFormProps) {
           {state?.error && (
             <div className="rounded-lg bg-red-50 p-4 text-red-700">{state.error}</div>
           )}
+
+          <ImageUpload value={pictureUrl} onChange={setPictureUrl} />
 
           <fieldset className="space-y-4">
             <legend className="text-lg font-semibold text-gray-900">

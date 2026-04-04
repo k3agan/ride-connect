@@ -9,6 +9,7 @@ import {
   ZoneBadge,
 } from "@/components/ride-badges";
 import { AdminRideActions } from "./ride-actions";
+import { Avatar } from "@/components/avatar";
 
 export default async function AdminDashboard({
   searchParams,
@@ -27,7 +28,7 @@ export default async function AdminDashboard({
     where,
     include: {
       claimedBy: { select: { name: true, email: true } },
-      client: { select: { name: true, phone: true } },
+      client: { select: { name: true, phone: true, pictureUrl: true } },
     },
     orderBy: { appointmentDate: "asc" },
   });
@@ -96,6 +97,7 @@ export default async function AdminDashboard({
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="space-y-2 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
+                    <Avatar src={ride.client?.pictureUrl} name={ride.seniorName} size="sm" />
                     <span className="text-lg font-semibold text-gray-900">
                       {ride.seniorName}
                     </span>

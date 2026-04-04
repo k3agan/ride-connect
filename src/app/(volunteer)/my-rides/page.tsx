@@ -8,6 +8,7 @@ import {
   ZoneBadge,
 } from "@/components/ride-badges";
 import { RideActions } from "./ride-actions";
+import { Avatar } from "@/components/avatar";
 
 export default async function MyRidesPage() {
   const session = await auth();
@@ -101,6 +102,7 @@ function RideCard({
     volunteerNotes: string | null;
     kmDriven: number | null;
     actualDurationMinutes: number | null;
+    client?: { pictureUrl: string | null } | null;
   };
   mapsRouteUrl: (pickup: string, dest: string) => string;
   showActions: boolean;
@@ -130,9 +132,12 @@ function RideCard({
 
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-2">
-            <h3 className="font-semibold text-gray-900">
-              {ride.seniorName}
-            </h3>
+            <div className="flex items-center gap-3">
+              <Avatar src={ride.client?.pictureUrl} name={ride.seniorName} size="md" />
+              <h3 className="font-semibold text-gray-900">
+                {ride.seniorName}
+              </h3>
+            </div>
 
             <a
               href={`tel:${ride.seniorPhone}`}
