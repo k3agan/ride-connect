@@ -18,3 +18,19 @@ export async function updateZonePreferences(userId: string, zones: string[]) {
 
   revalidatePath("/settings");
 }
+
+export async function updateAddress(userId: string, address: string) {
+  const session = await auth();
+  if (!session?.user || session.user.id !== userId) {
+    throw new Error("Unauthorized");
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { address: address || null },
+  });
+
+  revalidatePath("/settings");
+  revalidatePath("/rides");
+  revalidatePath("/my-rides");
+}

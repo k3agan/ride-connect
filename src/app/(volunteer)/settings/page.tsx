@@ -1,10 +1,16 @@
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { PreferencesForm } from "./preferences-form";
 
 export default async function SettingsPage() {
   const session = await auth();
   if (!session?.user) return null;
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { address: true },
+  });
 
   return (
     <div className="space-y-6">
@@ -13,17 +19,14 @@ export default async function SettingsPage() {
       <Card>
         <CardHeader>
           <h2 className="text-lg font-semibold text-gray-900">
-            Zone Preferences
+            Your Details
           </h2>
         </CardHeader>
         <CardBody>
-          <p className="text-sm text-gray-500 mb-4">
-            Select the zones you prefer to drive in. This helps you filter the
-            ride board to rides near you.
-          </p>
           <PreferencesForm
             userId={session.user.id}
             currentZones={session.user.preferredZones || []}
+            currentAddress={user?.address || ""}
           />
         </CardBody>
       </Card>

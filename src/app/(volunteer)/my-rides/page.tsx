@@ -42,9 +42,37 @@ export default async function MyRidesPage() {
     return `https://www.google.com/maps/dir/?api=1&origin=${waypoint}&destination=${dest}`;
   };
 
+  const completed = past.filter((r) => r.status === "completed");
+  const totalKm = completed.reduce((sum, r) => sum + (r.kmDriven || 0), 0);
+  const totalMinutes = completed.reduce((sum, r) => sum + (r.actualDurationMinutes || 0), 0);
+  const uniqueClients = new Set(completed.map((r) => r.seniorName)).size;
+
   return (
     <div className="space-y-8">
       <h1 className="text-2xl font-bold text-gray-900">My Rides</h1>
+
+      {completed.length > 0 && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Card className="p-4 text-center">
+            <p className="text-2xl font-bold text-blue-700">{completed.length}</p>
+            <p className="text-xs text-gray-500 mt-1">Rides Completed</p>
+          </Card>
+          <Card className="p-4 text-center">
+            <p className="text-2xl font-bold text-blue-700">{uniqueClients}</p>
+            <p className="text-xs text-gray-500 mt-1">Clients Helped</p>
+          </Card>
+          <Card className="p-4 text-center">
+            <p className="text-2xl font-bold text-blue-700">{totalKm > 0 ? totalKm.toFixed(1) : "—"}</p>
+            <p className="text-xs text-gray-500 mt-1">Total KM</p>
+          </Card>
+          <Card className="p-4 text-center">
+            <p className="text-2xl font-bold text-blue-700">
+              {totalMinutes > 0 ? `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m` : "—"}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">Total Time</p>
+          </Card>
+        </div>
+      )}
 
       <section className="space-y-4">
         <h2 className="text-lg font-semibold text-gray-800">Upcoming</h2>
@@ -65,14 +93,20 @@ export default async function MyRidesPage() {
         )}
       </section>
 
-      {past.length > 0 && (
-        <section className="space-y-4">
-          <h2 className="text-lg font-semibold text-gray-800">Past Rides</h2>
-          {past.map((ride) => (
-            <RideCard key={ride.id} ride={ride} mapsRouteUrl={mapsRouteUrl} showActions={false} />
-          ))}
-        </section>
-      )}
+      <section className="space-y-4">
+        <h2 className="text-lg font-semibold text-gray-800">Ride History</h2>
+        {past.length === 0 ? (
+          <Card className="p-6 text-center">
+            <p className="text-gray-500">
+              No past rides yet. Your completed rides will appear here.
+            </p>
+          </Card>
+        ) : (
+          past.map((ride) => (
+            <HistoryCard key={ride.id} ride={ride} />
+          ))
+        )}
+      </section>
     </div>
   );
 }
@@ -226,6 +260,75 @@ function RideCard({
 
         {showActions && (
           <RideActions ride={ride} />
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function HistoryCard({
+  ride,
+}: {
+  ride: {
+    id: string;
+    seniorName: string;
+    pickupAddress: string;
+    facilityName: string | null;
+    destinationAddress: string;
+    appointmentDate: Date;
+    appointmentTime: string;
+    status: "open" | "booked" | "confirmed" | "completed" | "deleted";
+    zone: "north_van" | "west_van" | "downtown_van" | "other";
+    kmDriven: number | null;
+    actualDurationMinutes: number | null;
+    volunteerNotes: string | null;
+    completedAt?: Date | null;
+    client?: { pictureUrl: string | null } | null;
+  };
+}) {
+  return (
+    <Card className="p-4">
+      <div className="flex items-center gap-4">
+        <Avatar src={ride.client?.pictureUrl} name={ride.seniorName} size="md" />
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold text-gray-900">{ride.seniorName}</span>
+            <StatusBadge status={ride.status} />
+            <ZoneBadge zone={ride.zone} />
+          </div>
+          <p className="text-sm text-gray-600">
+            {new Date(ride.appointmentDate).toLocaleDateString("en-US", {
+              weekday: "short",
+              month: "short",
+              day: "numeric",
+            })}{" "}
+            at {ride.appointmentTime}
+            {" · "}
+            {ride.facilityName
+              ? `${ride.facilityName}`
+              : ride.destinationAddress}
+          </p>
+          {ride.volunteerNotes && (
+            <p className="text-sm text-gray-400 italic truncate mt-0.5">
+              Note: {ride.volunteerNotes}
+            </p>
+          )}
+        </div>
+        {ride.status === "completed" && (
+          <div className="hidden sm:flex gap-4 text-sm text-gray-500 shrink-0">
+            {ride.kmDriven != null && (
+              <span className="text-center">
+                <span className="block text-lg font-semibold text-gray-700">{ride.kmDriven}</span>
+                <span className="text-xs">km</span>
+              </span>
+            )}
+            {ride.actualDurationMinutes != null && (
+              <span className="text-center">
+                <span className="block text-lg font-semibold text-gray-700">{ride.actualDurationMinutes}</span>
+                <span className="text-xs">min</span>
+              </span>
+            )}
+          </div>
         )}
       </div>
     </Card>
