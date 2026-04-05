@@ -6,8 +6,37 @@ import { auth } from "@/lib/auth";
 import { notifyNewRide, notifyRideBooked, notifyRideConfirmed, notifyRideCancelled } from "@/lib/notifications";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { type TripType, type MobilityAid, type Zone } from "@/generated/prisma/client";
+import { type TripType, type Zone } from "@/generated/prisma/client";
 import { estimateRideDistance } from "@/lib/distance";
+
+export async function getClientRideHistory(clientId: string) {
+  const session = await auth();
+  if (!session?.user || session.user.role !== "admin") {
+    throw new Error("Unauthorized");
+  }
+
+  return prisma.ride.findMany({
+    where: {
+      clientId,
+      status: { not: "deleted" },
+    },
+    orderBy: { appointmentDate: "desc" },
+    take: 10,
+    select: {
+      id: true,
+      pickupAddress: true,
+      facilityName: true,
+      destinationAddress: true,
+      appointmentDate: true,
+      appointmentTime: true,
+      appointmentDuration: true,
+      tripType: true,
+      zone: true,
+      notes: true,
+      status: true,
+    },
+  });
+}
 
 interface CreateRideInput {
   clientId: string;

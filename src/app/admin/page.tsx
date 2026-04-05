@@ -57,7 +57,10 @@ export default async function AdminDashboard({
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Link href="/admin/locations">
+            <Button variant="secondary" size="lg">Locations</Button>
+          </Link>
           <Link href="/admin/clients">
             <Button variant="secondary" size="lg">Manage Clients</Button>
           </Link>

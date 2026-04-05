@@ -88,6 +88,20 @@ async function main() {
     },
   });
 
+  // Saved locations for quick pick when creating rides (matches common sample data)
+  const savedLocations = [
+    { name: "LGH", address: "231 East 13th Street, North Vancouver, BC" },
+    { name: "Dialysis Centre", address: "144 West 15th Street, North Vancouver, BC" },
+    { name: "VGH", address: "899 West 12th Avenue, Vancouver, BC" },
+  ];
+  for (const loc of savedLocations) {
+    await prisma.location.upsert({
+      where: { name: loc.name },
+      update: { address: loc.address },
+      create: { name: loc.name, address: loc.address },
+    });
+  }
+
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   tomorrow.setHours(0, 0, 0, 0);
@@ -157,6 +171,7 @@ async function main() {
   console.log("Seeded users:", admin.email, volunteer1.email, volunteer2.email);
   console.log("Seeded clients:", barbara.name, jill.name, bobi.name);
   console.log("Seeded 3 sample rides");
+  console.log("Seeded saved locations:", savedLocations.map((l) => l.name).join(", "));
 }
 
 main()

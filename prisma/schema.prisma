@@ -205,6 +205,16 @@ model RideAuditLog {
   @@map("ride_audit_log")
 }
 
+model Location {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  address   String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("locations")
+}
+
 model Notification {
   id      String             @id @default(uuid()) @db.Uuid
   userId  String             @map("user_id") @db.Uuid
