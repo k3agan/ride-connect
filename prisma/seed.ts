@@ -8,10 +8,10 @@ const prisma = new PrismaClient({ adapter });
 async function main() {
   const admin = await prisma.user.upsert({
     where: { email: "coordinator@example.org" },
-    update: {},
+    update: { name: "Aseman (Coordinator)" },
     create: {
       email: "coordinator@example.org",
-      name: "Janet (Coordinator)",
+      name: "Aseman (Coordinator)",
       phone: "(604) 555-0100",
       role: "admin",
     },
@@ -19,7 +19,7 @@ async function main() {
 
   const volunteer1 = await prisma.user.upsert({
     where: { email: "antoinette@example.com" },
-    update: {},
+    update: { address: "123 Lonsdale Ave, North Vancouver" },
     create: {
       email: "antoinette@example.com",
       name: "Antoinette",
@@ -32,7 +32,7 @@ async function main() {
 
   const volunteer2 = await prisma.user.upsert({
     where: { email: "david@example.com" },
-    update: {},
+    update: { address: "456 Granville St, Vancouver" },
     create: {
       email: "david@example.com",
       name: "David",
