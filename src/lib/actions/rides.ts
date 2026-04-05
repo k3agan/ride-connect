@@ -6,7 +6,7 @@ import { auth } from "@/lib/auth";
 import { notifyNewRide, notifyRideBooked, notifyRideConfirmed, notifyRideCancelled } from "@/lib/notifications";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { type TripType, type Zone } from "@/generated/prisma/client";
+import { type TripType, type MobilityAid, type Zone } from "@/generated/prisma/client";
 import { estimateRideDistance } from "@/lib/distance";
 
 export async function getClientRideHistory(clientId: string) {

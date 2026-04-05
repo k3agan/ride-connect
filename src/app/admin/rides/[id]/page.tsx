@@ -1,8 +1,6 @@
 import { prisma } from "@/lib/db";
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import {
   StatusBadge,
   TripTypeBadge,
@@ -238,14 +236,7 @@ export default async function RideDetailPage({
               </div>
             )}
 
-            <div className="pt-4 border-t border-gray-100 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-              {ride.clientId && (
-                <Link href={`/admin/rides/new?fromRide=${ride.id}`}>
-                  <Button variant="secondary" size="lg">
-                    Schedule another like this
-                  </Button>
-                </Link>
-              )}
+            <div className="pt-4 border-t border-gray-100">
               <AdminRideActions rideId={ride.id} status={ride.status} />
             </div>
           </div>

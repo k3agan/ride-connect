@@ -1,6 +1,10 @@
-import "dotenv/config";
+import dotenv from "dotenv";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+
+dotenv.config({ path: ".env" });
+dotenv.config({ path: ".env.local", override: true });
+dotenv.config({ path: ".env.development.local", override: true });
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
@@ -88,7 +92,7 @@ async function main() {
     },
   });
 
-  // Saved locations for quick pick when creating rides (matches common sample data)
+  // Saved locations for quick pick when creating rides (demo / sample data)
   const savedLocations = [
     { name: "LGH", address: "231 East 13th Street, North Vancouver, BC" },
     { name: "Dialysis Centre", address: "144 West 15th Street, North Vancouver, BC" },

@@ -44,19 +44,6 @@ interface RideHistoryRecord {
   status: string;
 }
 
-/** Pre-fill from admin ride detail (?fromRide=) — same shape as history rows minus id/status/date */
-export interface NewRideInitialTemplate {
-  clientId: string;
-  pickupAddress: string;
-  facilityName: string | null;
-  destinationAddress: string;
-  appointmentTime: string;
-  appointmentDuration: string;
-  tripType: TripType;
-  zone: Zone;
-  notes: string | null;
-}
-
 const TRIP_TYPE_OPTIONS = [
   { value: "round_trip", label: "Round Trip" },
   { value: "one_way", label: "One-Way" },
@@ -86,11 +73,9 @@ function tripTypeLabel(t: string) {
 export function NewRideForm({
   clients,
   locations,
-  initialTemplate,
 }: {
   clients: ClientRecord[];
   locations: LocationRecord[];
-  initialTemplate?: NewRideInitialTemplate | null;
 }) {
   const [selectedClientId, setSelectedClientId] = useState("");
   const [clientSearch, setClientSearch] = useState("");
@@ -116,7 +101,6 @@ export function NewRideForm({
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const dateInputRef = useRef<HTMLInputElement>(null);
-  const initialTemplateAppliedRef = useRef(false);
 
   const selectedClient = useMemo(
     () => clients.find((c) => c.id === selectedClientId),
@@ -137,12 +121,12 @@ export function NewRideForm({
     );
   }, [locations, locationSearch]);
 
-  const loadHistory = useCallback(async (clientId: string, expandPanel = true) => {
+  const loadHistory = useCallback(async (clientId: string) => {
     setLoadingHistory(true);
     try {
       const history = await getClientRideHistory(clientId);
       setRideHistory(history);
-      if (expandPanel && history.length > 0) {
+      if (history.length > 0) {
         setShowHistory(true);
       }
     } catch {
@@ -168,22 +152,8 @@ export function NewRideForm({
     [clients, loadHistory]
   );
 
-  const applyTemplateFromRide = useCallback(
-    (
-      ride: Pick<
-        RideHistoryRecord,
-        | "pickupAddress"
-        | "facilityName"
-        | "destinationAddress"
-        | "appointmentTime"
-        | "appointmentDuration"
-        | "tripType"
-        | "zone"
-        | "notes"
-      >,
-      clientAddress: string,
-      options?: { dismissHistory?: boolean; scrollToDate?: boolean }
-    ) => {
+  const handleCopyRide = useCallback(
+    (ride: RideHistoryRecord) => {
       setFacilityName(ride.facilityName || "");
       setAppointmentTime(ride.appointmentTime);
       setAppointmentDuration(ride.appointmentDuration);
@@ -199,11 +169,9 @@ export function NewRideForm({
       );
       if (matchedLocation) {
         setSelectedLocationId(matchedLocation.id);
-      } else {
-        setSelectedLocationId("");
       }
 
-      const clientAddr = clientAddress || "";
+      const clientAddr = selectedClient?.address || "";
       const isReverse =
         clientAddr &&
         ride.destinationAddress.toLowerCase() === clientAddr.toLowerCase();
@@ -218,43 +186,15 @@ export function NewRideForm({
         setDestinationAddress(ride.destinationAddress);
       }
 
-      if (options?.dismissHistory) {
-        setShowHistory(false);
-      }
+      setShowHistory(false);
 
-      if (options?.scrollToDate !== false) {
-        requestAnimationFrame(() => {
-          dateInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-          dateInputRef.current?.focus();
-        });
-      }
+      requestAnimationFrame(() => {
+        dateInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+        dateInputRef.current?.focus();
+      });
     },
-    [locations]
+    [locations, selectedClient]
   );
-
-  const handleCopyRide = useCallback(
-    (ride: RideHistoryRecord) => {
-      const clientAddr = selectedClient?.address || "";
-      applyTemplateFromRide(ride, clientAddr, { dismissHistory: true, scrollToDate: true });
-    },
-    [applyTemplateFromRide, selectedClient]
-  );
-
-  useEffect(() => {
-    if (!initialTemplate || initialTemplateAppliedRef.current) return;
-    const client = clients.find((c) => c.id === initialTemplate.clientId);
-    if (!client) return;
-    initialTemplateAppliedRef.current = true;
-    setSelectedClientId(initialTemplate.clientId);
-    setClientSearch("");
-    applyTemplateFromRide(initialTemplate, client.address, {
-      dismissHistory: true,
-      scrollToDate: true,
-    });
-    setAppointmentDate("");
-    void loadHistory(initialTemplate.clientId, false);
-    setShowHistory(false);
-  }, [initialTemplate, clients, applyTemplateFromRide, loadHistory]);
 
   const handleDirectionToggle = (newDirection: Direction) => {
     if (newDirection === direction) return;
