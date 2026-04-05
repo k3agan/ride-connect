@@ -31,7 +31,7 @@ export default async function LoginPage() {
                 href="/api/dev-login?email=coordinator@example.org"
                 className="block rounded-lg bg-blue-600 px-4 py-3 text-center text-base font-medium text-white hover:bg-blue-700 transition-colors"
               >
-                Log in as Janet (Staff / Admin)
+                Log in as Aseman (Staff / Admin)
               </a>
               <a
                 href="/api/dev-login?email=antoinette@example.com"
