@@ -63,13 +63,13 @@ export default async function MyRidesPage() {
           </Card>
           <Card className="p-4 text-center">
             <p className="text-2xl font-bold text-blue-700">{totalKm > 0 ? totalKm.toFixed(1) : "—"}</p>
-            <p className="text-xs text-gray-500 mt-1">Total KM</p>
+            <p className="text-xs text-gray-500 mt-1">Est. KM</p>
           </Card>
           <Card className="p-4 text-center">
             <p className="text-2xl font-bold text-blue-700">
               {totalMinutes > 0 ? `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m` : "—"}
             </p>
-            <p className="text-xs text-gray-500 mt-1">Total Time</p>
+            <p className="text-xs text-gray-500 mt-1">Est. Time</p>
           </Card>
         </div>
       )}
@@ -228,9 +228,9 @@ function RideCard({
             href={mapsRouteUrl(ride.pickupAddress, ride.destinationAddress)}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-50 border border-blue-200 px-4 py-3 text-base font-medium text-blue-700 hover:bg-blue-100 transition-colors w-full sm:w-auto justify-center"
           >
-            📍 View Full Route in Maps
+            <span aria-hidden="true">📍</span> View Full Route in Maps
           </a>
         </div>
 

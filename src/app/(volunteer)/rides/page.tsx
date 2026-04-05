@@ -118,9 +118,9 @@ export default async function RideBoardPage({
                       href={mapsRouteUrl(ride.pickupAddress, ride.destinationAddress)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
+                      className="inline-flex items-center gap-2 rounded-lg bg-blue-50 border border-blue-200 px-4 py-3 text-base font-medium text-blue-700 hover:bg-blue-100 transition-colors"
                     >
-                      📍 View Route in Maps
+                      <span aria-hidden="true">📍</span> View Full Route in Maps
                     </a>
                   </div>
 

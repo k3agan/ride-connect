@@ -7,6 +7,7 @@ import { notifyNewRide, notifyRideBooked, notifyRideConfirmed, notifyRideCancell
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { type TripType, type MobilityAid, type Zone } from "@/generated/prisma/client";
+import { estimateRideDistance } from "@/lib/distance";
 
 interface CreateRideInput {
   clientId: string;
@@ -202,10 +203,7 @@ export async function unclaimRide(rideId: string) {
   return { success: true };
 }
 
-export async function completeRide(
-  rideId: string,
-  data: { kmDriven?: number; actualDurationMinutes?: number }
-) {
+export async function completeRide(rideId: string) {
   const session = await auth();
   if (!session?.user) {
     throw new Error("Unauthorized");
@@ -222,13 +220,15 @@ export async function completeRide(
     return { error: "You can only complete your own rides." };
   }
 
+  const { kmDriven, estimatedMinutes } = estimateRideDistance(ride.zone, ride.tripType);
+
   await prisma.ride.update({
     where: { id: rideId },
     data: {
       status: "completed",
       completedAt: new Date(),
-      kmDriven: data.kmDriven ?? null,
-      actualDurationMinutes: data.actualDurationMinutes ?? null,
+      kmDriven,
+      actualDurationMinutes: estimatedMinutes,
       version: { increment: 1 },
     },
   });
@@ -238,7 +238,7 @@ export async function completeRide(
     actorId: session.user.id,
     action: "completed",
     oldValues: { status: ride.status },
-    newValues: { status: "completed", kmDriven: data.kmDriven, actualDurationMinutes: data.actualDurationMinutes },
+    newValues: { status: "completed", kmDriven, estimatedMinutes },
   });
 
   revalidatePath("/rides");

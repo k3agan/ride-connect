@@ -23,9 +23,6 @@ export function RideActions({ ride }: RideActionsProps) {
   const [isPending, startTransition] = useTransition();
   const [showNotes, setShowNotes] = useState(false);
   const [notes, setNotes] = useState(ride.volunteerNotes || "");
-  const [showComplete, setShowComplete] = useState(false);
-  const [km, setKm] = useState("");
-  const [duration, setDuration] = useState("");
 
   const handleCancel = () => {
     if (!confirm("Are you sure you want to cancel this ride? It will be made available for other volunteers.")) return;
@@ -42,12 +39,9 @@ export function RideActions({ ride }: RideActionsProps) {
   };
 
   const handleComplete = () => {
+    if (!confirm("Mark this ride as completed? KM and duration will be calculated automatically.")) return;
     startTransition(async () => {
-      await completeRide(ride.id, {
-        kmDriven: km ? parseFloat(km) : undefined,
-        actualDurationMinutes: duration ? parseInt(duration) : undefined,
-      });
-      setShowComplete(false);
+      await completeRide(ride.id);
     });
   };
 
@@ -117,10 +111,10 @@ export function RideActions({ ride }: RideActionsProps) {
           <Button
             variant="success"
             size="md"
-            onClick={() => setShowComplete(!showComplete)}
+            onClick={handleComplete}
             disabled={isPending}
           >
-            ✓ Complete Ride
+            {isPending ? "Completing..." : "✓ Complete Ride"}
           </Button>
         )}
 
@@ -157,46 +151,6 @@ export function RideActions({ ride }: RideActionsProps) {
         </div>
       )}
 
-      {showComplete && (
-        <div className="rounded-lg border border-gray-200 p-3 space-y-3">
-          <p className="text-sm font-medium text-gray-700">Log trip details (optional, for invoicing)</p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Kilometers driven
-              </label>
-              <input
-                type="number"
-                step="0.1"
-                value={km}
-                onChange={(e) => setKm(e.target.value)}
-                className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                placeholder="e.g., 25.5"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Actual duration (minutes)
-              </label>
-              <input
-                type="number"
-                value={duration}
-                onChange={(e) => setDuration(e.target.value)}
-                className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                placeholder="e.g., 90"
-              />
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button size="sm" variant="success" onClick={handleComplete} disabled={isPending}>
-              {isPending ? "Completing..." : "Mark Completed"}
-            </Button>
-            <Button size="sm" variant="secondary" onClick={() => setShowComplete(false)}>
-              Cancel
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
